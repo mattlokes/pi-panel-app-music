@@ -1,0 +1,32 @@
+[package]
+name = "music"
+kind = "app"
+version = "0.1.0"
+description = "Now playing, Apple Music style: Music Assistant or a Home Assistant media player"
+
+[run]
+exec = ".venv/bin/pi-panel-music --config ${config_dir}/config.toml"
+# GTK_A11Y: there is no accessibility bus under the unit, and GTK would
+# otherwise wait for one at start.
+# GDK_DISABLE: GTK renders with GL (V3D on a Pi). Left alone it probes
+# Vulkan first, and logs that failure on every start.
+env = { GTK_A11Y = "none", GDK_DISABLE = "vulkan" }
+
+[build]
+# GTK's Python bindings (PyGObject) come from apt and must match the system
+# GTK, so the venv is created to see the system site-packages. Everything else
+# is pinned by uv.lock. Precompiled: the Pi boots from slow storage.
+command = "uv venv --system-site-packages --python /usr/bin/python3 --allow-existing && uv sync --frozen --no-dev --compile-bytecode"
+
+[config]
+templates = ["config.toml.example"]
+
+[system]
+packages = [
+    "python3-gi",
+    "gir1.2-gtk-4.0",    # GTK 4 (pulls in the Gdk, Gsk, Graphene and Pango typelibs)
+]
+
+[app]
+varlink = true
+rotate = false     # shown while something plays (see [show] in config.toml), not in the slideshow

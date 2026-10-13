@@ -1,0 +1,41 @@
+# pi-panel-app-music configuration.
+# pi-panel-pkg copies this to ~/.config/pi-panel/apps/music/config.toml.
+# It holds an access token: keep it readable only by you (chmod 600).
+
+# Where "now playing" comes from. Only that backend's section is used.
+#   "music_assistant"  a Music Assistant server, directly
+#   "home_assistant"   any media_player entity in Home Assistant
+backend = "music_assistant"
+
+[music_assistant]
+url = "http://mass.home.local:8095"
+# A long-lived token: Music Assistant > Settings > Profile > Long-lived access
+# tokens. Servers older than 2.7 need none.
+token = ""
+# The player to follow: its name as Music Assistant shows it, or its id.
+# Empty follows whichever player is playing.
+player = ""
+
+[home_assistant]
+url = "http://hass.home.local:8123"
+# A long-lived access token: Home Assistant > your profile > Security.
+token = ""
+entity = "media_player.living_room"
+
+[show]
+# Bring the app on screen when playback starts, and give the screen back
+# release_after seconds after it pauses or stops. false: the app is shown only
+# when asked (pi-panel-ctl show music, a schedule, Home Assistant).
+auto = true
+# The priority of that request, against schedules and other apps' requests
+# (a doorbell camera at 50 still wins).
+priority = 10
+release_after = 30
+
+[display]
+#   "side"     artwork on one side, text and controls beside it (iPad style)
+#   "stacked"  artwork centred, text and controls beneath it (iPhone style)
+layout = "side"
+# Side layout only: "left" or "right". Use it to keep the artwork clear of
+# the panel's clock overlay.
+artwork_side = "left"

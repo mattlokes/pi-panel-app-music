@@ -1,0 +1,34 @@
+# pi-panel-app-music: what is playing, Apple Music style.
+#
+# Served next to io.pipanel.App on $PI_PANEL_APP_SOCKET. Reach it with
+#   pi-panel-ctl app music io.pipanel.app.Music.GetStatus
+# Play/pause and skipping are io.pipanel.App actions: play_pause, next, previous.
+interface io.pipanel.app.Music
+
+method GetStatus() -> (
+  backend: (music_assistant, home_assistant, demo),
+  # connected to the backend, and following a player
+  connected: bool,
+  # what is wrong, when something is: "cannot reach Music Assistant"
+  problem: ?string,
+  visible: bool,
+  # this app is holding the screen (the [show] section of config.toml)
+  holding: bool,
+  state: (playing, paused, idle),
+  title: ?string,
+  artist: ?string,
+  album: ?string,
+  # seconds
+  duration: ?float,
+  position: ?float
+)
+
+# Jump to a position in the current track, in seconds.
+method Seek(position: float) -> ()
+
+# Re-read config.toml (as SIGHUP does). On an invalid file the running
+# configuration stays in effect and InvalidConfig says why.
+method Reload() -> ()
+
+error NotSeekable ()
+error InvalidConfig (message: string)
