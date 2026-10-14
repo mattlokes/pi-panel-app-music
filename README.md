@@ -71,7 +71,9 @@ it asks pi-panel-ctl for the screen when playback starts, and gives it back
 returns. `priority` ranks that request against schedules and other apps: at
 the default of 10, a doorbell camera shown at priority 50 still takes over.
 
-`pi-panel-ctl next` dismisses it; pressing play again brings it back.
+Picking another app (Home Assistant's *Showing* select, `pi-panel-ctl
+switch`, or `pi-panel-ctl next`) dismisses it. Pressing play again after a
+pause brings it back, but a change of track doesn't.
 
 Set `auto = false` to show it only on request (`pi-panel-ctl show music`, a
 schedule, or Home Assistant).

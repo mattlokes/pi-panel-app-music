@@ -15,13 +15,19 @@ from pi_panel_varlink import Client, ProtocolError, VarlinkError, VarlinkTimeout
 log = logging.getLogger("pi-panel-music")
 
 
+# Players stop for up to a second between tracks. A stop shorter than this
+# is a track change; a longer one ended by play is someone pressing play.
+RESUME_GAP = 2.0
+
+
 class AutoShow:
     """Show when playback starts; release |release_after| seconds after it
     pauses or stops, so a short pause doesn't give the screen away.
 
-    Every start of playback asks again, even if we believe we are still
-    shown: someone may have dismissed the app (pi-panel-ctl next drops holds)
-    and pressing play should bring it back.
+    Pressing play asks again, even if we believe we are still shown: someone
+    may have dismissed the app (pi-panel-ctl next, or picking another app in
+    Home Assistant, drops holds) and play should bring it back. A track
+    change does not ask: it would undo that choice at the end of every song.
     """
 
     def __init__(self, release_after: float, show: Callable[[], None],
@@ -33,14 +39,21 @@ class AutoShow:
         self.shown = False
         # When to release (on the caller's clock), while paused and shown.
         self.deadline: float | None = None
+        # When playback last stopped, on the caller's clock.
+        self.stopped_at: float | None = None
 
     def update(self, playing: bool, now: float) -> None:
         if playing and not self.playing:
-            self.shown = True
+            track_change = (self.shown and self.stopped_at is not None
+                            and now - self.stopped_at < RESUME_GAP)
             self.deadline = None
-            self._show()
-        elif not playing and self.playing and self.shown:
-            self.deadline = now + self.release_after
+            if not track_change:
+                self.shown = True
+                self._show()
+        elif not playing and self.playing:
+            self.stopped_at = now
+            if self.shown:
+                self.deadline = now + self.release_after
         self.playing = playing
         self.tick(now)
 

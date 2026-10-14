@@ -519,6 +519,24 @@ def test_autoshow_a_short_pause_keeps_the_screen():
     assert calls == ["show", "show"] and auto.deadline is None
 
 
+def test_autoshow_a_track_change_does_not_ask_again():
+    auto, calls = make_autoshow()
+    auto.update(True, 0.0)                               # first play asks
+    auto.update(False, 100.0)                            # between tracks...
+    auto.update(True, 100.5)                             # ...half a second
+    assert calls == ["show"] and auto.deadline is None
+    # If the user picked another app meanwhile, that choice stands; pressing
+    # play after a real pause brings music back.
+    auto.update(False, 200.0)
+    auto.update(True, 203.0)
+    assert calls == ["show", "show"]
+    # Once released, any play asks, however soon.
+    auto.update(False, 300.0)
+    auto.tick(330.0)
+    auto.update(True, 330.5)
+    assert calls == ["show", "show", "release", "show"]
+
+
 def test_autoshow_releases_at_once_when_told_and_when_the_wait_is_zero():
     auto, calls = make_autoshow()
     auto.update(True, 0.0)
