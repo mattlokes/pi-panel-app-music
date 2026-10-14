@@ -546,12 +546,17 @@ def test_panel_hold_never_stacks_holds(tmp_path):
 
     held: list[str] = []
     shows: list[dict] = []
+    counts: list[int] = []                       # holds after each Show/Release
+    slow = asyncio.Event()
+    slow.set()
     ctl = Interface(FAKE_CTL)
 
     @ctl.method("Show")
     async def show(call):
+        await slow.wait()
         shows.append({"app": call.param("app", str), "priority": call.param("priority", int)})
         held.append(f"token-{len(shows)}")
+        counts.append(len(held))
         return {"token": held[-1]}
 
     @ctl.method("Release")
@@ -560,6 +565,7 @@ def test_panel_hold_never_stacks_holds(tmp_path):
         if token not in held:
             raise VarlinkError("io.pipanel.Ctl.NoSuchHold", {"token": token})
         held.remove(token)
+        counts.append(len(held))
 
     async def scenario():
         address = f"unix:{tmp_path}/ctl"
@@ -570,14 +576,25 @@ def test_panel_hold_never_stacks_holds(tmp_path):
             hold = PanelHold(address, "music", 10)
             await hold.show()
             assert held == ["token-1"] and shows == [{"app": "music", "priority": 10}]
+            counts.clear()
             await hold.show()                    # play again: the old hold is swapped, not added to
             assert held == ["token-2"]
+            # The new hold came first: music was never without one, so ctl
+            # had no moment to switch to another app (the track-change fade).
+            assert counts == [2, 1]
             held.clear()                         # dismissed behind our back (pi-panel-ctl next)
             await hold.release()                 # NoSuchHold is not an error
             assert hold.token is None
             await asyncio.gather(hold.show(), hold.show())      # two at once
             assert held == [hold.token]
             await hold.release()
+            assert held == [] and hold.token is None
+            slow.clear()                         # released while a Show is on its way
+            pending = asyncio.create_task(hold.show())
+            await asyncio.sleep(0.05)
+            await hold.release()
+            slow.set()
+            await pending
             assert held == [] and hold.token is None
         finally:
             await server.close()

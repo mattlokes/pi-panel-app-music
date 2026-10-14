@@ -57,29 +57,47 @@ class AutoShow:
 
 
 class PanelHold:
-    """At most one io.pipanel.Ctl hold for this app. Coroutines; run them on
-    one event loop, where they cannot interleave between awaits that matter:
-    each takes the token before it awaits."""
+    """At most one io.pipanel.Ctl hold for this app once each call is done.
+    Coroutines; run them on one event loop, where they cannot interleave
+    between awaits that matter.
+
+    show() asks for the new hold before it drops the old one. The other way
+    round, the app holds nothing for a moment, ctl switches to the next app
+    and straight back: a fade out and in at every track change, since players
+    report a brief pause between tracks."""
 
     def __init__(self, address: str, app: str, priority: int) -> None:
         self.client = Client(address, timeout=3.0)
         self.app = app
         self.priority = priority
         self.token: str | None = None
+        # The last call was show(), not release(). A release() while a Show
+        # is waiting for its reply drops the hold that reply brings.
+        self.wanted = False
 
     async def show(self) -> None:
-        await self.release()        # never stack holds
+        self.wanted = True
+        previous = self.token
         try:
             reply = await self.client.call("io.pipanel.Ctl.Show",
                                            {"app": self.app, "priority": self.priority})
         except (VarlinkError, VarlinkUnavailable, VarlinkTimeout, ProtocolError) as exc:
             log.warning("pi-panel-ctl would not show %s: %s", self.app, exc)
             return
-        stale, self.token = self.token, reply.get("token")
-        if stale:                   # a second show() got in while we waited
-            await self._drop(stale)
+        token = reply.get("token")
+        if not self.wanted:         # released while we waited
+            if token:
+                await self._drop(token)
+            return
+        # Swap, then drop the old hold, and one a second show() running at
+        # the same time took meanwhile.
+        current, self.token = self.token, token
+        for stale in dict.fromkeys((previous, current)):
+            if stale and stale != token:
+                await self._drop(stale)
 
     async def release(self) -> None:
+        self.wanted = False
         token, self.token = self.token, None
         if token:
             await self._drop(token)
